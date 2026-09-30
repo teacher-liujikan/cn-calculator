@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>堆肥碳氮比計算機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#ECEFE3; --paper:#F8F9F3; --ink:#27261E; --muted:#6B6A5C; --line:#CFD3C0;
+  --carbon:#8A5A33; --carbon-soft:#E9DCCB; --nitro:#3E7B3A; --nitro-soft:#D6E6CF;
+  --straw:#D4A23A; --warn:#A6402B;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1D1F19; --paper:#26291F; --ink:#E9EAE0; --muted:#A3A594; --line:#3C4033;
+    --carbon:#C99263; --carbon-soft:#3D3024; --nitro:#7DBA6F; --nitro-soft:#2A3A26;
+    --straw:#E2B758; --warn:#E07A62;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1D1F19; --paper:#26291F; --ink:#E9EAE0; --muted:#A3A594; --line:#3C4033;
+  --carbon:#C99263; --carbon-soft:#3D3024; --nitro:#7DBA6F; --nitro-soft:#2A3A26;
+  --straw:#E2B758; --warn:#E07A62;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  font-size:16px;line-height:1.65}
+main{max-width:960px;margin:0 auto;padding:32px 20px 56px}
+h1{font-family:"Noto Serif TC","Songti TC",serif;font-weight:900;font-size:clamp(28px,5vw,40px);
+  line-height:1.2;margin:0 0 8px;letter-spacing:.02em}
+.lede{color:var(--muted);margin:0 0 28px;max-width:60ch}
+.sources{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:640px){.sources{grid-template-columns:1fr}}
+.src{background:var(--paper);border-radius:14px;padding:18px 18px 20px;border-top:6px solid var(--c)}
+.src.c{--c:var(--carbon);--cs:var(--carbon-soft)}
+.src.n{--c:var(--nitro);--cs:var(--nitro-soft)}
+.src h2{font-family:"Noto Serif TC",serif;font-size:21px;margin:0 0 2px;color:var(--c)}
+.src .hint{font-size:13px;color:var(--muted);margin:0 0 14px}
+label{display:block;font-size:14px;font-weight:500;margin:12px 0 6px}
+select,input[type=number]{width:100%;font:inherit;color:var(--ink);background:var(--bg);
+  border:1.5px solid var(--line);border-radius:8px;padding:9px 11px}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid var(--straw);outline-offset:2px}
+.ratio{display:flex;align-items:baseline;gap:8px;margin-top:14px;padding:10px 12px;border-radius:8px;background:var(--cs)}
+.ratio b{font-size:28px;font-variant-numeric:tabular-nums;color:var(--c);line-height:1}
+.ratio span{font-size:13px;color:var(--muted)}
+.manual{display:none}
+.manual.on{display:block}
+
+.panel{background:var(--paper);border-radius:14px;padding:20px;margin-top:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:640px){.row{grid-template-columns:1fr}}
+.target-wrap{display:flex;gap:12px;align-items:center}
+.target-wrap input[type=range]{flex:1;accent-color:var(--straw)}
+.target-wrap input[type=number]{width:90px}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;font:inherit;font-size:15px;padding:9px 6px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"].bc{background:var(--carbon);color:#fff}
+.seg button[aria-pressed="true"].bn{background:var(--nitro);color:#fff}
+.amt{display:flex;gap:8px}
+.amt select{width:110px;flex:none}
+
+.result{margin-top:16px;background:var(--paper);border-radius:14px;padding:22px 20px}
+.answer{font-size:18px;margin:0}
+.answer strong{font-family:"Noto Serif TC",serif;font-size:clamp(34px,7vw,52px);font-weight:900;
+  font-variant-numeric:tabular-nums;line-height:1.1;display:inline-block;margin:0 4px}
+.answer .ac{color:var(--carbon)} .answer .an{color:var(--nitro)}
+.sub{color:var(--muted);margin:6px 0 0}
+.err{color:var(--warn);font-weight:500;margin:0}
+
+.mix{display:flex;height:34px;border-radius:8px;overflow:hidden;margin:20px 0 6px;font-size:13px;font-weight:500;color:#fff}
+.mix div{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;transition:flex-basis .35s ease}
+.mix .mc{background:var(--carbon)} .mix .mn{background:var(--nitro)}
+
+.gauge{position:relative;height:74px;margin:26px 6px 4px}
+.track{position:absolute;left:0;right:0;top:30px;height:10px;border-radius:5px;
+  background:linear-gradient(90deg,var(--nitro),var(--line) 45%,var(--carbon))}
+.band{position:absolute;top:24px;height:22px;border:2px solid var(--straw);border-radius:5px;background:color-mix(in srgb,var(--straw) 25%,transparent)}
+.pin{position:absolute;top:0;transform:translateX(-50%);text-align:center;font-size:12px;line-height:1.2;white-space:nowrap;transition:left .35s ease}
+.pin::after{content:"";display:block;width:2px;height:22px;margin:3px auto 0;background:currentColor}
+.pin.pc{color:var(--carbon)} .pin.pn{color:var(--nitro)}
+.pin.pt{color:var(--ink);top:auto;bottom:0}
+.pin.pt::after{display:none}
+.pin.pt::before{content:"";display:block;width:14px;height:14px;margin:0 auto 3px;border-radius:50%;background:var(--straw);border:3px solid var(--paper);box-shadow:0 0 0 1.5px var(--ink)}
+.ticks{position:relative;height:18px;margin:0 6px;font-size:11px;color:var(--muted)}
+.ticks span{position:absolute;transform:translateX(-50%)}
+
+details{margin-top:16px;background:var(--paper);border-radius:14px;padding:14px 20px}
+summary{cursor:pointer;font-weight:500}
+.tbl{overflow-x:auto;margin-top:12px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left}
+td.v{text-align:right}
+th{font-weight:500;color:var(--muted)}
+.foot{font-size:13px;color:var(--muted);margin-top:18px;max-width:70ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>堆肥碳氮比計算機</h1>
+  <p class="lede">選好碳源和氮源，輸入其中一種的體積，設定目標碳氮比，就能算出另一種要加多少。</p>
+
+  <div class="sources">
+    <section class="src c" aria-labelledby="hc">
+      <h2 id="hc">碳源</h2>
+      <p class="hint">乾、硬、褐色的材料，如稻草、木屑、落葉</p>
+      <label for="selC">材料</label>
+      <select id="selC"></select>
+      <div class="manual" id="manC">
+        <label for="inC">碳氮比（手動輸入）</label>
+        <input id="inC" type="number" min="1" step="0.1" value="60">
+      </div>
+      <div class="ratio"><b id="showC">—</b><span>碳氮比</span></div>
+    </section>
+
+    <section class="src n" aria-labelledby="hn">
+      <h2 id="hn">氮源</h2>
+      <p class="hint">濕、軟、綠色的材料，如禽畜糞、菜渣、豆渣</p>
+      <label for="selN">材料</label>
+      <select id="selN"></select>
+      <div class="manual" id="manN">
+        <label for="inN">碳氮比（手動輸入）</label>
+        <input id="inN" type="number" min="1" step="0.1" value="15">
+      </div>
+      <div class="ratio"><b id="showN">—</b><span>碳氮比</span></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="row">
+      <div>
+        <label for="tgtR" style="margin-top:0">目標碳氮比</label>
+        <div class="target-wrap">
+          <input id="tgtR" type="range" min="10" max="40" step="0.5" value="20" aria-label="目標碳氮比滑桿">
+          <input id="tgtN" type="number" min="1" step="0.5" value="20" aria-label="目標碳氮比">
+        </div>
+        <p class="note" id="tgtNote">建議有機肥碳氮比為 15–25</p>
+      </div>
+      <div>
+        <label style="margin-top:0" id="knownLbl">我已知道的是</label>
+        <div class="seg" role="group" aria-labelledby="knownLbl">
+          <button type="button" class="bc" id="kC" aria-pressed="true">碳源的量</button>
+          <button type="button" class="bn" id="kN" aria-pressed="false">氮源的量</button>
+        </div>
+        <label for="amt" id="amtLbl">碳源體積</label>
+        <div class="amt">
+          <input id="amt" type="number" min="0" step="0.1" value="10">
+          <select id="unit" aria-label="體積單位">
+            <option>公升</option><option>桶</option><option>鏟</option><option>立方公尺</option><option>份</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="result" aria-live="polite">
+    <div id="out"></div>
+    <div class="mix" id="mix" aria-hidden="true"><div class="mc" id="mixC"></div><div class="mn" id="mixN"></div></div>
+    <div class="gauge" id="gauge" aria-hidden="true">
+      <div class="track"></div>
+      <div class="band" id="band"></div>
+      <div class="pin pn" id="pinN"></div>
+      <div class="pin pc" id="pinC"></div>
+      <div class="pin pt" id="pinT"></div>
+    </div>
+    <div class="ticks" id="ticks" aria-hidden="true"></div>
+  </section>
+
+  <details>
+    <summary>一般材料碳氮比參考表</summary>
+    <div class="tbl"><table id="ref"><thead><tr><th>材料</th><th style="text-align:right">碳氮比</th><th>分類</th></tr></thead><tbody></tbody></table></div>
+  </details>
+
+  <p class="foot">計算方式：以體積比做加權平均，混合碳氮比 =（碳源量 × 碳源 C/N ＋ 氮源量 × 氮源 C/N）÷（碳源量 ＋ 氮源量）。這是簡易估算，假設各材料每單位體積的含氮量相近；實際上材料的密度與含水率不同，結果僅供配料參考，堆肥過程請依溫度、濕度與氣味調整。廢棄香菇介質原表為 27~42，此處取中間值 34.5。</p>
+</main>
+
+<script>
+const DATA = [
+  ["紙碎",150],["報紙",150],["紙張",150],["樹皮",125],["稻草",100],["稻殼",88],["稻桿",84],["枯草",80],
+  ["廢棄木耳介質",75],["高粱稈",73],["玉米桿",68],["松針",66],["廢棄太空包木屑",64],["粟米穗軸",60],["乾樹葉",60],
+  ["新鮮樹葉",45],["廢棄洋菇介質",44],["大豆莖",40],["椰殼",37],["廢棄香菇介質（27~42）",34.5],
+  ["豆莢",30],["太陽麻",30],["花生莖",30],["果皮及果心",30],
+  ["花生殼",28],["紅蘿蔔",27],["野草",25],["田菁",24],["油菜",23],["草木灰",23],
+  ["肉雞糞",20],["羊糞",20],["咖啡渣",20],["草碎",20],["米糠",20],["埃及三葉草",19],["海藻",19],
+  ["牛糞",18.8],["白飯",15],["洋蔥和辣椒",15],["豬糞",14.3],["蛋雞糞",12],["苕子",12],["菜莢",12],["蕃茄",12],["豆渣",5]
+];
+const isC = v => v >= 30;
+const $ = id => document.getElementById(id);
+
+function fill(sel, preferC, def){
+  const g1 = document.createElement("optgroup"); g1.label = preferC ? "高碳材料（C/N ≥ 30）" : "高氮材料（C/N < 30）";
+  const g2 = document.createElement("optgroup"); g2.label = preferC ? "其他材料" : "其他材料";
+  DATA.forEach(([n,v])=>{
+    const o = new Option(`${n}　${v}`, v); o.dataset.name = n.replace(/（.*）/,"");
+    (isC(v) === preferC ? g1 : g2).appendChild(o);
+  });
+  const m = new Option("✎ 手動輸入碳氮比","manual");
+  sel.append(g1, g2, m);
+  [...sel.options].forEach(o=>{ if(o.dataset.name===def) o.selected = true; });
+}
+fill($("selC"), true, "稻草");
+fill($("selN"), false, "牛糞");
+
+const tb = document.querySelector("#ref tbody");
+DATA.forEach(([n,v])=>{
+  tb.insertAdjacentHTML("beforeend",`<tr><td>${n}</td><td class="v">${v}</td><td>${isC(v)?"碳源":"氮源"}</td></tr>`);
+});
+
+let known = "C";
+const fmt = x => (Math.round(x*100)/100).toLocaleString("zh-TW",{maximumFractionDigits:2});
+
+function getR(side){
+  const sel = $("sel"+side), man = $("man"+side);
+  const manual = sel.value === "manual";
+  man.classList.toggle("on", manual);
+  const v = manual ? parseFloat($("in"+side).value) : parseFloat(sel.value);
+  const name = manual ? (side==="C"?"碳源":"氮源") : sel.selectedOptions[0].dataset.name;
+  return {v, name};
+}
+
+// log scale 5..160
+const LO = Math.log(4), HI = Math.log(160);
+const pos = v => Math.min(100, Math.max(0, (Math.log(Math.max(v,4))-LO)/(HI-LO)*100));
+$("ticks").innerHTML = [5,10,15,25,50,100,150].map(t=>`<span style="left:${pos(t)}%">${t}</span>`).join("");
+$("band").style.left = pos(15)+"%"; $("band").style.width = (pos(25)-pos(15))+"%";
+
+function calc(){
+  const C = getR("C"), N = getR("N");
+  const R = parseFloat($("tgtN").value);
+  const A = parseFloat($("amt").value);
+  const unit = $("unit").value;
+  $("showC").textContent = isFinite(C.v) ? fmt(C.v) : "—";
+  $("showN").textContent = isFinite(N.v) ? fmt(N.v) : "—";
+  $("amtLbl").textContent = known==="C" ? `${C.name}體積` : `${N.name}體積`;
+
+  const inBand = R>=15 && R<=25;
+  $("tgtNote").textContent = inBand ? "建議有機肥碳氮比為 15–25" : "此目標超出建議範圍 15–25";
+  $("tgtNote").style.color = inBand ? "" : "var(--warn)";
+
+  $("pinC").style.left = pos(C.v)+"%"; $("pinC").textContent = `碳源 ${fmt(C.v)}`;
+  $("pinN").style.left = pos(N.v)+"%"; $("pinN").textContent = `氮源 ${fmt(N.v)}`;
+  $("pinT").style.left = pos(R)+"%";   $("pinT").textContent = `目標 ${fmt(R)}`;
+
+  const out = $("out"), mix = $("mix");
+  const fail = msg => { out.innerHTML = `<p class="err">${msg}</p>`; mix.style.visibility="hidden"; };
+
+  if(![C.v,N.v,R,A].every(isFinite) || C.v<=0 || N.v<=0 || R<=0) return fail("請填入有效的碳氮比、目標值與體積。");
+  if(A<=0) return fail("請輸入大於 0 的體積。");
+  if(C.v <= R) return fail(`碳源的碳氮比（${fmt(C.v)}）必須高於目標 ${fmt(R)}，請換一種含碳量更高的碳源，或降低目標值。`);
+  if(N.v >= R) return fail(`氮源的碳氮比（${fmt(N.v)}）必須低於目標 ${fmt(R)}，請換一種含氮量更高的氮源，或提高目標值。`);
+
+  let vc, vn;
+  if(known==="C"){ vc = A; vn = A*(C.v-R)/(R-N.v); }
+  else           { vn = A; vc = A*(R-N.v)/(C.v-R); }
+  const total = vc+vn;
+  const pc = vc/total*100;
+
+  const need = known==="C"
+    ? `<p class="answer">需加入 ${N.name}<strong class="an">${fmt(vn)}</strong>${unit}</p>`
+    : `<p class="answer">需加入 ${C.name}<strong class="ac">${fmt(vc)}</strong>${unit}</p>`;
+  const ratio = vc>=vn ? `碳源 : 氮源 ≈ ${fmt(vc/vn)} : 1` : `碳源 : 氮源 ≈ 1 : ${fmt(vn/vc)}`;
+  out.innerHTML = need + `<p class="sub">混合後總體積 ${fmt(total)} ${unit}，${ratio}，碳氮比約 ${fmt(R)}</p>`;
+
+  mix.style.visibility="visible";
+  $("mixC").style.flexBasis = pc+"%"; $("mixN").style.flexBasis = (100-pc)+"%";
+  $("mixC").textContent = pc>=12 ? `${C.name} ${fmt(pc)}%` : "";
+  $("mixN").textContent = (100-pc)>=12 ? `${N.name} ${fmt(100-pc)}%` : "";
+}
+
+$("tgtR").addEventListener("input",e=>{ $("tgtN").value = e.target.value; calc(); });
+$("tgtN").addEventListener("input",e=>{ const v=parseFloat(e.target.value); if(isFinite(v)) $("tgtR").value = Math.min(40,Math.max(10,v)); calc(); });
+["selC","selN","inC","inN","amt","unit"].forEach(id=>$(id).addEventListener("input",calc));
+["kC","kN"].forEach(id=>$(id).addEventListener("click",()=>{
+  known = id==="kC" ? "C" : "N";
+  $("kC").setAttribute("aria-pressed", known==="C");
+  $("kN").setAttribute("aria-pressed", known==="N");
+  calc();
+}));
+calc();
+</script>
+</body>
+</html>
